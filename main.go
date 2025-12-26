@@ -20,14 +20,15 @@ type ESPExample struct {
 	createdWebhookID     *int64
 	createdDomainID      string
 	createdIPPoolID      *int64
+	createdIPPoolName    string
 	sentMessageID        string
 }
 
 // Configuration constants - Update these with your values
 const (
 	basePath       = "https://api.sendpost.io/api/v1"
-	testFromEmail  = "example@yourdomain.com"
-	testToEmail    = "example@yourdomain.com"
+	testFromEmail  = "sender@yourdomain.com"
+	testToEmail    = "recipient@example.com"
 	testDomainName = "yourdomain.com"
 	webhookURL     = "https://your-webhook-endpoint.com/webhook"
 )
@@ -401,6 +402,12 @@ func (e *ESPExample) SendTransactionalEmail() {
 	}
 	emailMessage.SetHeaders(headers)
 
+	// Use IP pool if available
+	if e.createdIPPoolName != "" {
+		emailMessage.SetIppool(e.createdIPPoolName)
+		fmt.Printf("  Using IP Pool: %s\n", e.createdIPPoolName)
+	}
+
 	fmt.Println("Sending transactional email...")
 	fmt.Printf("  From: %s\n", testFromEmail)
 	fmt.Printf("  To: %s\n", testToEmail)
@@ -478,6 +485,12 @@ func (e *ESPExample) SendMarketingEmail() {
 		"X-Campaign-ID": "campaign-001",
 	}
 	emailMessage.SetHeaders(headers)
+
+	// Use IP pool if available
+	if e.createdIPPoolName != "" {
+		emailMessage.SetIppool(e.createdIPPoolName)
+		fmt.Printf("  Using IP Pool: %s\n", e.createdIPPoolName)
+	}
 
 	fmt.Println("Sending marketing email...")
 	fmt.Printf("  From: %s\n", testFromEmail)
@@ -617,8 +630,8 @@ func (e *ESPExample) GetSubAccountStats() {
 		if stat.Date != nil {
 			fmt.Printf("\n  Date: %s\n", *stat.Date)
 		}
-		if stat.Stats != nil {
-			statData := stat.Stats
+		if stat.Stat != nil {
+			statData := stat.Stat
 			if statData.Processed != nil {
 				fmt.Printf("    Processed: %d\n", *statData.Processed)
 				totalProcessed += int64(*statData.Processed)
@@ -764,7 +777,7 @@ func (e *ESPExample) CreateIPPool() {
 	}
 
 	// Create IP pool request
-	poolName := fmt.Sprintf("Marketing Pool - %d", time.Now().Unix())
+	poolName := fmt.Sprintf("Marketing Pool %d", time.Now().Unix())
 	routingStrategy := int32(0) // 0 = RoundRobin, 1 = EmailProviderStrategy
 
 	poolIPs := []sendpost.EIP{}
@@ -779,9 +792,18 @@ func (e *ESPExample) CreateIPPool() {
 	poolRequest.SetRoutingStrategy(routingStrategy)
 	poolRequest.SetIps(poolIPs)
 
+	// Set warmup interval (required, must be > 0)
+	warmupInterval := int32(24) // 24 hours
+	poolRequest.SetWarmupInterval(warmupInterval)
+
+	// Set overflow strategy (0 = None, 1 = Use overflow pool)
+	overflowStrategy := int32(0)
+	poolRequest.SetOverflowStrategy(overflowStrategy)
+
 	fmt.Printf("Creating IP pool: %s\n", poolName)
 	fmt.Println("  Routing Strategy: Round Robin")
 	fmt.Printf("  IPs: %d\n", len(poolIPs))
+	fmt.Printf("  Warmup Interval: %d hours\n", warmupInterval)
 
 	ipPool, resp, err := ipPoolsAPI.CreateIPPool(ctx).IPPoolCreateRequest(*poolRequest).Execute()
 
@@ -795,6 +817,9 @@ func (e *ESPExample) CreateIPPool() {
 	if ipPool.Id != nil {
 		id := int64(*ipPool.Id)
 		e.createdIPPoolID = &id
+	}
+	if ipPool.Name != nil {
+		e.createdIPPoolName = *ipPool.Name
 	}
 
 	fmt.Println("✓ IP pool created successfully!")
@@ -946,24 +971,24 @@ func (e *ESPExample) RunCompleteWorkflow() {
 	e.AddDomain()
 	e.ListDomains()
 
-	// Step 4: Send emails
+	// Step 4: Manage IPs and IP pools (before sending emails)
+	e.ListIPs()
+	e.CreateIPPool()
+	e.ListIPPools()
+
+	// Step 5: Send emails (using the created IP pool)
 	e.SendTransactionalEmail()
 	e.SendMarketingEmail()
-
-	// Step 5: Retrieve message details
-	e.GetMessageDetails()
 
 	// Step 6: Monitor statistics
 	e.GetSubAccountStats()
 	e.GetAggregateStats()
 
-	// Step 7: Manage IPs and IP pools
-	e.ListIPs()
-	e.CreateIPPool()
-	e.ListIPPools()
-
-	// Step 8: Get account-level overview
+	// Step 7: Get account-level overview
 	e.GetAccountStats()
+
+	// Step 8: Retrieve message details (at the end to give system time to store data)
+	e.GetMessageDetails()
 
 	fmt.Println("\n╔═══════════════════════════════════════════════════════════════╗")
 	fmt.Println("║   Workflow Complete!                                          ║")

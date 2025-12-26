@@ -26,7 +26,7 @@ The example demonstrates a complete ESP workflow including:
 ### 1. Clone or Navigate to the Project
 
 ```bash
-cd example-sdk-go
+cd go-esp-example
 ```
 
 ### 2. Configure API Keys
@@ -63,8 +63,10 @@ Edit `main.go` and update the constants at the top of the file:
 ### Install Dependencies
 
 ```bash
-go mod download
+go mod tidy
 ```
+
+This will download required dependencies and update the `go.mod` file. Note that `go.sum` is not required to be committed.
 
 ### Run the Complete Workflow
 
