@@ -937,8 +937,8 @@ func (e *ESPExample) GetAccountStats() {
 			if statData.Unsubscribed != nil {
 				fmt.Printf("    Unsubscribed: %d\n", *statData.Unsubscribed)
 			}
-			if statData.Spams != nil {
-				fmt.Printf("    Spams: %d\n", *statData.Spams)
+			if statData.Spam != nil {
+				fmt.Printf("    Spam: %d\n", *statData.Spam)
 			}
 		}
 	}
